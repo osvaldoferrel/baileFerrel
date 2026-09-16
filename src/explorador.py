@@ -1,157 +1,153 @@
-"""Problema de búsqueda: explorador con llaves y puertas.
-
-El estado del problema es:
-    (posicion, llaves_recogidas)
-
-La clase Laberinto contiene el mapa y las reglas del problema. El módulo
-usa TreeSearch para ejecutar BFS, DFS y A*.
-"""
-
-try:
-    from .SimpleSearch import TreeSearch, node
-except ImportError:
-    from SimpleSearch import TreeSearch, node
-
-
+from SimpleSearch import TreeSearch, node
 class Laberinto:
-    """Representación de un laberinto de búsqueda."""
+    def __init__(self, mapa, llaves, puertas):
+        self.mapa = mapa
+        self.llaves = llaves
+        self.puertas = puertas
 
-    DIRECCIONES = {
-        "arriba": (-1, 0),
-        "abajo": (1, 0),
-        "izquierda": (0, -1),
-        "derecha": (0, 1),
-    }
+        self.filas = len(mapa)
+        self.columnas = len(mapa[0])
 
-    def __init__(self, mapa, llaves=None, puertas=None):
-        self.mapa = [list(fila) for fila in mapa]
-        self.filas = len(self.mapa)
-        self.columnas = len(self.mapa[0])
-        self.llaves = llaves or {}
-        self.puertas = puertas or {}
+        self.inicio = self.buscar("E")
+        self.salida = self.buscar("S")
 
-        self.inicio = self._buscar("E")
-        self.salida = self._buscar("S")
+    def buscar(self, simbolo):
+        for fila in range(self.filas):
+            for columna in range(self.columnas):
 
-        if self.inicio is None:
-            raise ValueError("El laberinto necesita una casilla de inicio E")
-        if self.salida is None:
-            raise ValueError("El laberinto necesita una casilla de salida S")
-
-    def _buscar(self, simbolo):
-        for f in range(self.filas):
-            for c in range(self.columnas):
-                if self.mapa[f][c] == simbolo:
-                    return (f, c)
+                if self.mapa[fila][columna] == simbolo:
+                    return (fila, columna)
         return None
 
     def dentro(self, posicion):
-        f, c = posicion
-        return 0 <= f < self.filas and 0 <= c < self.columnas
-
-    def es_pared(self, posicion):
-        f, c = posicion
-        return self.mapa[f][c] == "#"
+        fila, columna = posicion
+        return (
+            0 <= fila < self.filas
+            and 0 <= columna < self.columnas
+        )
 
     def sucesores(self, actual):
-        """Genera todos los movimientos legales desde un nodo."""
         posicion, llaves = actual.state
+        fila, columna = posicion
+        movimientos = [
+            ("arriba", -1, 0),
+            ("abajo", 1, 0),
+            ("izquierda", 0, -1),
+            ("derecha", 0, 1)
+        ]
         hijos = []
+        for nombre, cambio_fila, cambio_columna in movimientos:
 
-        for movimiento, (df, dc) in self.DIRECCIONES.items():
-            nueva_posicion = (posicion[0] + df, posicion[1] + dc)
+            nueva_fila = fila + cambio_fila
+            nueva_columna = columna + cambio_columna
 
+            nueva_posicion = (nueva_fila, nueva_columna)
+
+            # Fuera del laberinto
             if not self.dentro(nueva_posicion):
                 continue
-            if self.es_pared(nueva_posicion):
+            # Pared
+            if self.mapa[nueva_fila][nueva_columna] == "#":
                 continue
-
-            # Una puerta solo puede cruzarse si se posee su llave.
+            # Puerta
             if nueva_posicion in self.puertas:
-                llave_necesaria = self.puertas[nueva_posicion]
-                if llave_necesaria not in llaves:
+
+                llave = self.puertas[nueva_posicion]
+
+                if llave not in llaves:
                     continue
 
+            # Copiamos las llaves actuales
             nuevas_llaves = llaves
-            if nueva_posicion in self.llaves:
-                nuevas_llaves = llaves | frozenset([self.llaves[nueva_posicion]])
 
-            estado = (nueva_posicion, nuevas_llaves)
-            hijos.append(node(
-                estado,
+            # Si encontramos una llave, la recogemos
+            if nueva_posicion in self.llaves:
+
+                llave = self.llaves[nueva_posicion]
+
+                nuevas_llaves = llaves | frozenset([llave])
+
+            nuevo_estado = (
+                nueva_posicion,
+                nuevas_llaves
+            )
+
+            hijo = node(
+                nuevo_estado,
                 parent=actual,
                 depth=actual.depth + 1,
-                op=movimiento,
+                op=nombre,
                 step_cost=1
-            ))
+            )
+
+            hijos.append(hijo)
 
         return hijos
 
-    def es_meta(self, actual, _objetivo=None):
-        """La meta se alcanza al llegar a la salida."""
-        posicion, _ = actual.state
+    def meta(self, actual, objetivo=None):
+        posicion, llaves = actual.state
         return posicion == self.salida
 
-    def heuristica(self, actual, _objetivo=None):
-        """Distancia Manhattan a la salida, ignorando obstáculos."""
-        posicion, _ = actual.state
-        return (
-            abs(posicion[0] - self.salida[0])
-            + abs(posicion[1] - self.salida[1])
+    def heuristica(self, actual, objetivo=None):
+        posicion, llaves = actual.state
+        fila, columna = posicion
+        fila_salida, columna_salida = self.salida
+        distancia = (
+            abs(fila - fila_salida)
+            + abs(columna - columna_salida)
         )
+        return distancia
 
-    def resolver(self, estrategia="bfs", max_iter=1000000):
-        """Ejecuta BFS, DFS o A* y devuelve solución y expansiones."""
-        estado_inicial = (self.inicio, frozenset())
+    def resolver(self, estrategia):
+        estado_inicial = (
+            self.inicio,
+            frozenset()
+        )
         inicial = node(estado_inicial)
-
         busqueda = TreeSearch(
             inicial,
             self.sucesores,
-            self.es_meta,
+            self.meta,
             strategy=estrategia,
             goal_state=self.salida,
-            heuristic=self.heuristica if estrategia == "a*" else None,
+            heuristic=self.heuristica
         )
-
-        solucion = busqueda.find(max_iter=max_iter)
+        solucion = busqueda.find()
         return solucion, busqueda.iterations
 
-    def mostrar(self):
-        """Imprime el mapa usando K para llaves y D para puertas."""
-        for f in range(self.filas):
-            fila = ""
-            for c in range(self.columnas):
-                posicion = (f, c)
-                if posicion in self.llaves:
-                    fila += "K"
-                elif posicion in self.puertas:
-                    fila += "D"
-                else:
-                    fila += self.mapa[f][c]
-            print(fila)
 
-
-def crear_laberinto_ejemplo():
-    """Laberinto pequeño donde la llave es necesaria para llegar a la salida."""
+def crear_laberinto():
     mapa = [
         "#########",
         "#E.K.D.S#",
-        "#########",
+        "#########"
     ]
-
     llaves = {
-        (1, 3): "K1",
+        (1, 3): "K1"
     }
-
     puertas = {
-        (1, 5): "K1",
+        (1, 5): "K1"
     }
+    return Laberinto(
+        mapa,
+        llaves,
+        puertas
+    )
 
-    return Laberinto(mapa, llaves, puertas)
+if __name__ == "__main__":
+    laberinto = crear_laberinto()
+    print("Inicio:", laberinto.inicio)
+    print("Salida:", laberinto.salida)
+    solucion, explorados = laberinto.resolver("bfs")
+    if solucion:
+        print("\nCamino encontrado:")
+        for estado, movimiento, profundidad in solucion.getPath():
+            print(
+                profundidad,
+                movimiento,
+                estado
+            )
+        print("\nEstados explorados:", explorados)
 
-
-def resolver_ejemplo(estrategia="bfs"):
-    """Atajo para probar BFS, DFS o A* con el ejemplo."""
-    laberinto = crear_laberinto_ejemplo()
-    return laberinto.resolver(estrategia)
+    else:
+        print("No se encontró una solución.")
