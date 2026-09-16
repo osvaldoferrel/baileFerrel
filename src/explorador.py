@@ -66,7 +66,7 @@ class Laberinto:
             if self.es_pared(nueva_posicion):
                 continue
 
-            # Una puerta solo puede cruzarse si ya se posee su llave.
+            # Una puerta solo puede cruzarse si se posee su llave.
             if nueva_posicion in self.puertas:
                 llave_necesaria = self.puertas[nueva_posicion]
                 if llave_necesaria not in llaves:
@@ -101,7 +101,7 @@ class Laberinto:
         )
 
     def resolver(self, estrategia="bfs", max_iter=1000000):
-        """Ejecuta una búsqueda y devuelve el nodo solución."""
+        """Ejecuta BFS, DFS o A* y devuelve solución y expansiones."""
         estado_inicial = (self.inicio, frozenset())
         inicial = node(estado_inicial)
 
@@ -133,18 +133,13 @@ class Laberinto:
 
 
 def crear_laberinto_ejemplo():
-    """Laberinto pequeño para probar el modelo antes de usar 15x15."""
+    """Laberinto pequeño donde la llave es necesaria para llegar a la salida."""
     mapa = [
         "#########",
         "#E.K.D.S#",
-        "#.#.###.#",
-        "#.#.....#",
-        "#.#######",
-        "#.......#",
         "#########",
     ]
 
-    # Las coordenadas se expresan como (fila, columna).
     llaves = {
         (1, 3): "K1",
     }
