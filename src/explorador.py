@@ -9,7 +9,7 @@ class Laberinto:
         "izquierda": (0, -1),
         "derecha": (0, 1)
     }
-
+#constructor
     def __init__(self, mapa, llaves, puertas):
 
         self.mapa = [list(fila) for fila in mapa]
